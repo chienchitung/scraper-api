@@ -8,7 +8,7 @@ from typing import Optional
 
 app = FastAPI(
     title="Scraper API",
-    description="API for scraping app reviews from Apple Store and Google Play",
+    description="API for scraping app reviews",
     version="1.0.0"
 )
 
@@ -20,11 +20,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# 健康檢查路由
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
 
 # API 金鑰驗證
 API_KEY = os.getenv("API_KEY")
@@ -46,17 +41,11 @@ class ScrapeRequest(BaseModel):
 
 @app.get("/")
 async def root():
-    return {
-        "status": "ok",
-        "message": "Scraper API is running",
-        "version": "1.0.0",
-        "endpoints": {
-            "root": "/",
-            "health": "/health",
-            "scrape": "/scrape",
-            "docs": "/docs"
-        }
-    }
+    return {"status": "ok"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 @app.post("/scrape")
 async def scrape_reviews(
@@ -91,11 +80,15 @@ async def scrape_reviews(
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "8000"))
-    print(f"Starting server on port {port}")
+    workers = int(os.getenv("WORKERS", "1"))
+    timeout = int(os.getenv("TIMEOUT", "300"))
+    
+    print(f"Starting server on port {port} with {workers} workers")
     uvicorn.run(
-        "main:app",
+        app,
         host="0.0.0.0",
         port=port,
-        workers=1,
+        workers=workers,
+        timeout_keep_alive=timeout,
         log_level="info"
     )

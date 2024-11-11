@@ -19,6 +19,8 @@ COPY . .
 # 設置環境變數
 ENV PORT=8000
 ENV PYTHONUNBUFFERED=1
+ENV WORKERS=1
+ENV TIMEOUT=300
 
 # 運行應用
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT 
+CMD uvicorn main:app --host 0.0.0.0 --port $PORT --workers $WORKERS --timeout-keep-alive $TIMEOUT
