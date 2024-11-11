@@ -21,6 +21,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# 健康檢查路由
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
 # API 金鑰驗證
 API_KEY = os.getenv("API_KEY")
 api_key_header = APIKeyHeader(name="Authorization")
@@ -39,7 +44,6 @@ class ScrapeRequest(BaseModel):
     appleStore: Optional[str] = None
     googlePlay: Optional[str] = None
 
-# 添加根路由
 @app.get("/")
 async def root():
     return {
@@ -48,9 +52,9 @@ async def root():
         "version": "1.0.0",
         "endpoints": {
             "root": "/",
+            "health": "/health",
             "scrape": "/scrape",
-            "docs": "/docs",
-            "redoc": "/redoc"
+            "docs": "/docs"
         }
     }
 
@@ -86,4 +90,12 @@ async def scrape_reviews(
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))
+    port = int(os.getenv("PORT", "8000"))
+    print(f"Starting server on port {port}")
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=port,
+        workers=1,
+        log_level="info"
+    )
