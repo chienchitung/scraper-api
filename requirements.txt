@@ -1,1 +1,11 @@
- 
+fastapi
+uvicorn
+google-play-scraper
+apple-app-reviews-scraper
+python-dotenv
+pydantic
+emoji
+pytz
+requests
+beautifulsoup4
+langdetect 
