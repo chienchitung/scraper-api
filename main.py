@@ -76,13 +76,5 @@ async def scrape_reviews(
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "8000"))
-    workers = int(os.getenv("WORKERS", "1"))
-    
-    print(f"Starting server on port {port} with {workers} workers")
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=port,
-        workers=workers,
-        log_level="info"
-    )
+    print(f"Starting server on port {port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)
