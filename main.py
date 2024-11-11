@@ -6,12 +6,16 @@ from scraper import fetch_ios_reviews, fetch_android_reviews
 import os
 from typing import Optional
 
-app = FastAPI()
+app = FastAPI(
+    title="Scraper API",
+    description="API for scraping app reviews from Apple Store and Google Play",
+    version="1.0.0"
+)
 
 # 配置 CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 在生產環境中應該限制為你的 Vercel 域名
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -35,28 +39,51 @@ class ScrapeRequest(BaseModel):
     appleStore: Optional[str] = None
     googlePlay: Optional[str] = None
 
+# 添加根路由
+@app.get("/")
+async def root():
+    return {
+        "status": "ok",
+        "message": "Scraper API is running",
+        "version": "1.0.0",
+        "endpoints": {
+            "root": "/",
+            "scrape": "/scrape",
+            "docs": "/docs",
+            "redoc": "/redoc"
+        }
+    }
+
 @app.post("/scrape")
 async def scrape_reviews(
     request: ScrapeRequest,
     api_key: str = Depends(verify_api_key)
 ):
     try:
+        print(f"Received request: {request}")
         ios_reviews = []
         android_reviews = []
 
         if request.appleStore:
+            print(f"Fetching iOS reviews from: {request.appleStore}")
             ios_reviews = fetch_ios_reviews(request.appleStore)
+            print(f"Found {len(ios_reviews)} iOS reviews")
         
         if request.googlePlay:
+            print(f"Fetching Android reviews from: {request.googlePlay}")
             android_reviews = fetch_android_reviews(request.googlePlay)
+            print(f"Found {len(android_reviews)} Android reviews")
 
-        return {
+        result = {
             "success": True,
             "data": ios_reviews + android_reviews
         }
+        print(f"Returning {len(result['data'])} total reviews")
+        return result
     except Exception as e:
+        print(f"Error in scrape_reviews: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000"))) 
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))

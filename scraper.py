@@ -114,30 +114,36 @@ def fetch_apple_reviews(country: str, app_name: str, app_id: str, token: str, of
 
 def fetch_ios_reviews(url: str) -> List[dict]:
     try:
+        print(f"Starting iOS review fetch for URL: {url}")
         pattern = r'apps\.apple\.com/(\w+)/app/([^/]+)/id(\d+)'
         match = re.search(pattern, url)
         if not match:
+            print("URL pattern did not match")
             return []
             
         country_code = match.group(1)
-        app_name = 'ikea'  # 使用固定名稱
+        app_name = 'ikea'
         app_id = match.group(3)
         
-        # 獲取 token
+        print(f"Getting token for {country_code}/{app_name}/{app_id}")
         token = get_token(country_code, app_name, app_id)
         if not token:
+            print("Failed to get token")
             return []
         
+        print("Successfully got token")
         all_reviews = []
         offset = '1'
         MAX_REVIEWS = 100000
         
         while offset and int(offset) <= MAX_REVIEWS:
+            print(f"Fetching reviews with offset: {offset}")
             reviews, next_offset, status_code = fetch_apple_reviews(
                 country_code, app_name, app_id, token, offset
             )
             
             if status_code != 200:
+                print(f"Received non-200 status code: {status_code}")
                 break
                 
             processed_reviews = [{
@@ -150,16 +156,19 @@ def fetch_ios_reviews(url: str) -> List[dict]:
                 'language': detect_language(review.get('attributes', {}).get('review', ''))
             } for review in reviews]
             
+            print(f"Processed {len(processed_reviews)} reviews")
             all_reviews.extend(processed_reviews)
             offset = next_offset
             
-            # 添加延遲以避免請求過快
             time.sleep(0.5)
             
+        print(f"Total reviews collected: {len(all_reviews)}")
         return all_reviews
             
     except Exception as e:
         print(f"Error fetching iOS reviews: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
         return []
 
 def fetch_android_reviews(url: str) -> List[dict]:
