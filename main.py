@@ -43,10 +43,6 @@ class ScrapeRequest(BaseModel):
 async def root():
     return {"status": "ok"}
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
-
 @app.post("/scrape")
 async def scrape_reviews(
     request: ScrapeRequest,
@@ -81,7 +77,6 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "8000"))
     workers = int(os.getenv("WORKERS", "1"))
-    timeout = int(os.getenv("TIMEOUT", "300"))
     
     print(f"Starting server on port {port} with {workers} workers")
     uvicorn.run(
@@ -89,6 +84,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=port,
         workers=workers,
-        timeout_keep_alive=timeout,
         log_level="info"
     )
