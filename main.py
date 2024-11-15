@@ -5,7 +5,6 @@ from pydantic import BaseModel
 from scraper import fetch_ios_reviews, fetch_android_reviews
 import os
 from typing import Optional
-from datetime import datetime
 
 app = FastAPI(
     title="Scraper API",
@@ -64,13 +63,9 @@ async def scrape_reviews(
             android_reviews = fetch_android_reviews(request.googlePlay)
             print(f"Found {len(android_reviews)} Android reviews")
 
-        # 合併評論並按日期排序
-        all_reviews = ios_reviews + android_reviews
-        all_reviews.sort(key=lambda x: datetime.strptime(x['date'], '%Y-%m-%d'), reverse=True)
-
         result = {
             "success": True,
-            "data": all_reviews
+            "data": ios_reviews + android_reviews
         }
         print(f"Returning {len(result['data'])} total reviews")
         return result

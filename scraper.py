@@ -9,7 +9,6 @@ import json
 import random
 import time
 from tqdm import tqdm
-import urllib.parse
 
 # 定義 User-Agents
 user_agents = [
@@ -26,129 +25,108 @@ def detect_language(text):
     if re.search(r'[\u4e00-\u9fff]', text):
         return 'zh'
     
+    if re.match(r'^[a-zA-Z0-9\s\.,!?\'"-]+$', text):
+        return 'en'
+    
     try:
         lang = detect(text)
         return 'en' if lang == 'en' else 'unknown'
     except LangDetectException:
         return 'unknown'
 
-def parse_apple_url(url: str) -> tuple[str, str, str]:
-    """解析 Apple Store URL"""
-    try:
-        # 解碼 URL
-        decoded_url = urllib.parse.unquote(url)
-        
-        # 使用更精確的正則表達式
-        pattern = r'apps\.apple\.com/(\w+)/app/[^/]+/id(\d+)'
-        match = re.search(pattern, decoded_url)
-        
-        if not match:
-            raise ValueError(f"Invalid Apple Store URL format: {url}")
-            
-        country_code = match.group(1)
-        app_id = match.group(2)
-        
-        # 從 URL 提取 app_name 或使用默認值
-        app_name = 'testritegroup'
-        
-        return country_code, app_name, app_id
-    except Exception as e:
-        print(f"Error parsing Apple Store URL: {str(e)}")
-        raise
-
 def get_token(country: str, app_name: str, app_id: str) -> Optional[str]:
     """獲取 Apple Store API 的 token"""
-    try:
-        response = requests.get(
-            f'https://apps.apple.com/{country}/app/{app_name}/id{app_id}',
-            headers={'User-Agent': random.choice(user_agents)}
-        )
+    response = requests.get(
+        f'https://apps.apple.com/{country}/app/{app_name}/id{app_id}',
+        headers={'User-Agent': random.choice(user_agents)}
+    )
 
-        if response.status_code != 200:
-            print(f"GET request failed. Response: {response.status_code} {response.reason}")
-            return None
-
-        tags = response.text.splitlines()
-        token = None
-        for tag in tags:
-            if re.match(r"<meta.+web-experience-app/config/environment", tag):
-                token_match = re.search(r"token%22%3A%22(.+?)%22", tag)
-                if token_match:
-                    token = token_match.group(1)
-                    break
-
-        if not token:
-            print("無法找到 token")
-            return None
-
-        return token
-    except Exception as e:
-        print(f"Error getting token: {str(e)}")
+    if response.status_code != 200:
+        print(f"GET request failed. Response: {response.status_code} {response.reason}")
         return None
+
+    tags = response.text.splitlines()
+    token = None
+    for tag in tags:
+        if re.match(r"<meta.+web-experience-app/config/environment", tag):
+            token = re.search(r"token%22%3A%22(.+?)%22", tag).group(1)
+            break
+
+    if not token:
+        print("無法找到 token")
+        return None
+
+    return token
 
 def fetch_apple_reviews(country: str, app_name: str, app_id: str, token: str, offset: str = '1') -> tuple[list, Optional[str], int]:
     """獲取 App Store 評論"""
-    try:
-        landing_url = f'https://apps.apple.com/{country}/app/{app_name}/id{app_id}'
-        request_url = f'https://amp-api.apps.apple.com/v1/catalog/{country}/apps/{app_id}/reviews'
+    landing_url = f'https://apps.apple.com/{country}/app/{app_name}/id{app_id}'
+    request_url = f'https://amp-api.apps.apple.com/v1/catalog/{country}/apps/{app_id}/reviews'
 
-        headers = {
-            'Accept': 'application/json',
-            'Authorization': f'bearer {token}',
-            'Connection': 'keep-alive',
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'Origin': 'https://apps.apple.com',
-            'Referer': landing_url,
-            'User-Agent': random.choice(user_agents)
-        }
+    headers = {
+        'Accept': 'application/json',
+        'Authorization': f'bearer {token}',
+        'Connection': 'keep-alive',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'Origin': 'https://apps.apple.com',
+        'Referer': landing_url,
+        'User-Agent': random.choice(user_agents)
+    }
 
-        params = (
-            ('l', 'zh-TW'),
-            ('offset', str(offset)),
-            ('limit', '20'),
-            ('platform', 'web'),
-            ('additionalPlatforms', 'appletv,ipad,iphone,mac')
-        )
+    params = (
+        ('l', 'zh-TW'),
+        ('offset', str(offset)),
+        ('limit', '20'),
+        ('platform', 'web'),
+        ('additionalPlatforms', 'appletv,ipad,iphone,mac')
+    )
 
-        retry_count = 0
-        MAX_RETRIES = 5
-        BASE_DELAY_SECS = 10
+    retry_count = 0
+    MAX_RETRIES = 5
+    BASE_DELAY_SECS = 10
+    reviews = []
 
-        while retry_count < MAX_RETRIES:
-            response = requests.get(request_url, headers=headers, params=params)
+    while retry_count < MAX_RETRIES:
+        response = requests.get(request_url, headers=headers, params=params)
+        
+        if response.status_code == 200:
+            result = response.json()
+            reviews = result.get('data', [])
             
-            if response.status_code == 200:
-                result = response.json()
-                reviews = result.get('data', [])
-                
-                next_offset = None
-                if 'next' in result and result['next']:
-                    next_match = re.search(r"^.+offset=([0-9]+).*$", result['next'])
-                    if next_match:
-                        next_offset = next_match.group(1)
-                
-                return reviews, next_offset, response.status_code
-                
-            elif response.status_code == 429:
-                retry_count += 1
-                backoff_time = BASE_DELAY_SECS * retry_count
-                print(f"達到請求限制! 重試 ({retry_count}/{MAX_RETRIES}) 等待 {backoff_time} 秒...")
-                time.sleep(backoff_time)
-                continue
-                
-            else:
-                print(f"請求失敗. 回應: {response.status_code} {response.reason}")
-                return [], None, response.status_code
+            # 獲取下一頁的 offset
+            next_offset = None
+            if 'next' in result and result['next']:
+                next_match = re.search(r"^.+offset=([0-9]+).*$", result['next'])
+                if next_match:
+                    next_offset = next_match.group(1)
+            
+            return reviews, next_offset, response.status_code
+            
+        elif response.status_code == 429:  # 達到請求限制
+            retry_count += 1
+            backoff_time = BASE_DELAY_SECS * retry_count
+            print(f"達到請求限制! 重試 ({retry_count}/{MAX_RETRIES}) 等待 {backoff_time} 秒...")
+            time.sleep(backoff_time)
+            continue
+            
+        else:
+            print(f"請求失敗. 回應: {response.status_code} {response.reason}")
+            return [], None, response.status_code
 
-        return [], None, 429
-    except Exception as e:
-        print(f"Error fetching Apple reviews: {str(e)}")
-        return [], None, 500
+    return [], None, 429
 
 def fetch_ios_reviews(url: str) -> List[dict]:
     try:
         print(f"Starting iOS review fetch for URL: {url}")
-        country_code, app_name, app_id = parse_apple_url(url)
+        pattern = r'apps\.apple\.com/(\w+)/app/([^/]+)/id(\d+)'
+        match = re.search(pattern, url)
+        if not match:
+            print("URL pattern did not match")
+            return []
+            
+        country_code = match.group(1)
+        app_name = 'ikea'
+        app_id = match.group(3)
         
         print(f"Getting token for {country_code}/{app_name}/{app_id}")
         token = get_token(country_code, app_name, app_id)
@@ -172,7 +150,7 @@ def fetch_ios_reviews(url: str) -> List[dict]:
                 break
                 
             processed_reviews = [{
-                'date': datetime.strptime(review.get('attributes', {}).get('date', ''), '%Y-%m-%dT%H:%M:%SZ').strftime('%Y-%m-%d'),
+                'date': review.get('attributes', {}).get('date', ''),
                 'username': review.get('attributes', {}).get('userName', ''),
                 'review': review.get('attributes', {}).get('review', ''),
                 'rating': review.get('attributes', {}).get('rating', 0),
@@ -188,10 +166,6 @@ def fetch_ios_reviews(url: str) -> List[dict]:
             time.sleep(0.5)
             
         print(f"Total reviews collected: {len(all_reviews)}")
-        
-        # 按日期排序（從新到舊）
-        all_reviews.sort(key=lambda x: x['date'], reverse=True)
-        
         return all_reviews
             
     except Exception as e:
@@ -200,23 +174,9 @@ def fetch_ios_reviews(url: str) -> List[dict]:
         print(traceback.format_exc())
         return []
 
-def parse_android_url(url: str) -> str:
-    """解析 Google Play URL"""
-    try:
-        pattern = r'id=([^&]+)'
-        match = re.search(pattern, url)
-        if not match:
-            raise ValueError(f"Invalid Google Play URL format: {url}")
-        return match.group(1)
-    except Exception as e:
-        print(f"Error parsing Google Play URL: {str(e)}")
-        raise
-
 def fetch_android_reviews(url: str) -> List[dict]:
     try:
-        android_id = parse_android_url(url)
-        print(f"Fetching Android reviews for app ID: {android_id}")
-        
+        android_id = url.split('id=')[1].split('&')[0]
         reviews_zh = reviews_all(android_id, lang='zh_TW', country='tw')
         reviews_en = reviews_all(android_id, lang='en', country='tw')
         
@@ -231,15 +191,9 @@ def fetch_android_reviews(url: str) -> List[dict]:
                 'developerResponse': review.get('replyContent', ''),
                 'language': detect_language(review['content'])
             })
-        
-        # 按日期排序（從新到舊）
-        all_reviews.sort(key=lambda x: x['date'], reverse=True)
-        
-        print(f"Total Android reviews collected: {len(all_reviews)}")
+            
         return all_reviews
         
     except Exception as e:
         print(f"Error fetching Android reviews: {str(e)}")
-        import traceback
-        print(traceback.format_exc())
         return []
