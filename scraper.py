@@ -165,7 +165,7 @@ def fetch_ios_reviews(url: str) -> List[dict]:
         print("Successfully got token")
         all_reviews = []
         offset = '1'
-        MAX_REVIEWS = 500
+        MAX_REVIEWS = 250
         
         while offset and len(all_reviews) < MAX_REVIEWS:
             print(f"Fetching reviews with offset: {offset}")
@@ -226,7 +226,7 @@ def parse_android_url(url: str) -> str:
 
 def fetch_android_reviews(url: str) -> List[dict]:
     try:
-        MAX_REVIEWS = 500
+        MAX_REVIEWS = 250
         android_id = parse_android_url(url)
         print(f"Fetching Android reviews for app ID: {android_id}")
         
