@@ -1,7 +1,7 @@
 from typing import List, Optional
 from datetime import datetime
 import re
-from google_play_scraper import reviews_all
+from google_play_scraper import reviews, Sort
 import emoji
 from langdetect import detect, LangDetectException
 import requests
@@ -226,15 +226,28 @@ def parse_android_url(url: str) -> str:
 
 def fetch_android_reviews(url: str) -> List[dict]:
     try:
-        REVIEWS_PER_PLATFORM = 150  # 修改：每個平台抓取 150 則評論
+        REVIEWS_PER_PLATFORM = 150  # 每個平台抓取 150 則評論
+        reviews_per_language = REVIEWS_PER_PLATFORM // 2  # 各取 75 則
         android_id = parse_android_url(url)
         print(f"Fetching Android reviews for app ID: {android_id}")
         
-        # 取得評論
-        # 因為要平均分配中英文評論，所以各取 75 則
-        reviews_per_language = REVIEWS_PER_PLATFORM // 2
-        reviews_zh = reviews_all(android_id, lang='zh_TW', country='tw')[:reviews_per_language]
-        reviews_en = reviews_all(android_id, lang='en', country='tw')[:reviews_per_language]
+        # 取得中文評論
+        reviews_zh, continuation_token_zh = reviews(
+            android_id,
+            lang='zh_TW',
+            country='tw',
+            sort=Sort.NEWEST,
+            count=reviews_per_language
+        )
+        
+        # 取得英文評論
+        reviews_en, continuation_token_en = reviews(
+            android_id,
+            lang='en',
+            country='tw',
+            sort=Sort.NEWEST,
+            count=reviews_per_language
+        )
         
         # 合併並處理評論
         all_reviews = []
