@@ -165,9 +165,9 @@ def fetch_ios_reviews(url: str) -> List[dict]:
         print("Successfully got token")
         all_reviews = []
         offset = '1'
-        MAX_REVIEWS = 100000
+        MAX_REVIEWS = 500
         
-        while offset and int(offset) <= MAX_REVIEWS:
+        while offset and len(all_reviews) < MAX_REVIEWS:
             print(f"Fetching reviews with offset: {offset}")
             reviews, next_offset, status_code = fetch_apple_reviews(
                 country_code, app_name, app_id, token, offset
@@ -187,10 +187,16 @@ def fetch_ios_reviews(url: str) -> List[dict]:
                 'language': detect_language(review.get('attributes', {}).get('review', ''))
             } for review in reviews]
             
+            remaining_slots = MAX_REVIEWS - len(all_reviews)
+            processed_reviews = processed_reviews[:remaining_slots]
+            
             print(f"Processed {len(processed_reviews)} reviews")
             all_reviews.extend(processed_reviews)
-            offset = next_offset
             
+            if len(all_reviews) >= MAX_REVIEWS:
+                break
+                
+            offset = next_offset
             time.sleep(0.5)
             
         print(f"Total reviews collected: {len(all_reviews)}")
@@ -198,7 +204,7 @@ def fetch_ios_reviews(url: str) -> List[dict]:
         # 按日期排序（從新到舊）
         all_reviews.sort(key=lambda x: x['date'], reverse=True)
         
-        return all_reviews
+        return all_reviews[:MAX_REVIEWS]
             
     except Exception as e:
         print(f"Error fetching iOS reviews: {str(e)}")
@@ -220,14 +226,19 @@ def parse_android_url(url: str) -> str:
 
 def fetch_android_reviews(url: str) -> List[dict]:
     try:
+        MAX_REVIEWS = 500
         android_id = parse_android_url(url)
         print(f"Fetching Android reviews for app ID: {android_id}")
         
+        # 取得評論
         reviews_zh = reviews_all(android_id, lang='zh_TW', country='tw')
         reviews_en = reviews_all(android_id, lang='en', country='tw')
         
+        # 合併並處理評論
         all_reviews = []
-        for review in reviews_zh + reviews_en:
+        combined_reviews = (reviews_zh + reviews_en)[:MAX_REVIEWS]
+        
+        for review in combined_reviews:
             all_reviews.append({
                 'date': review['at'].strftime('%Y-%m-%d'),
                 'username': review['userName'],
@@ -242,7 +253,7 @@ def fetch_android_reviews(url: str) -> List[dict]:
         all_reviews.sort(key=lambda x: x['date'], reverse=True)
         
         print(f"Total Android reviews collected: {len(all_reviews)}")
-        return all_reviews
+        return all_reviews[:MAX_REVIEWS]
         
     except Exception as e:
         print(f"Error fetching Android reviews: {str(e)}")
