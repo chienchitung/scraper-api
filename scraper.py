@@ -227,7 +227,7 @@ def parse_android_url(url: str) -> str:
 def fetch_android_reviews(url: str) -> List[dict]:
     try:
         REVIEWS_PER_PLATFORM = 150  # 每個平台抓取 150 則評論
-        reviews_per_language = REVIEWS_PER_PLATFORM // 2  # 各取 75 則
+        reviews_per_language = REVIEWS_PER_PLATFORM 
         android_id = parse_android_url(url)
         print(f"Fetching Android reviews for app ID: {android_id}")
         
